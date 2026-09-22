@@ -8,6 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from extract import ensure_bucket
+from utils import measure
 
 
 logger = logging.getLogger("etl_pipeline.silver.load")
@@ -23,11 +24,12 @@ def run(cfg: dict, s3, df_silver: pd.DataFrame) -> dict[str, int]:
     """Guarda Silver en MinIO y devuelve sus métricas básicas."""
     destination = cfg["silver"]
     ensure_bucket(s3, destination["bucket"])
-    s3.put_object(
-        Bucket=destination["bucket"],
-        Key=destination["object_path"],
-        Body=_parquet_bytes(df_silver),
-    )
+    with measure("load_silver", rows=len(df_silver)):
+        s3.put_object(
+            Bucket=destination["bucket"],
+            Key=destination["object_path"],
+            Body=_parquet_bytes(df_silver),
+        )
     metrics = {"total_rows": len(df_silver)}
     logger.info(
         "Silver persistido | bucket=%s | filas=%s",
