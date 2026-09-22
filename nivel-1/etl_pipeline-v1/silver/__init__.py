@@ -1,0 +1,1 @@
+"""Capa Silver del pipeline ETL."""
