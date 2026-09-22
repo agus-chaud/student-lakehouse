@@ -56,3 +56,6 @@ gold:
     revenue_by_payment:
       object_path: "yellow_taxi/revenue_by_payment.parquet"
       table: "gold_revenue_by_payment"
+    route_analysis:
+      object_path: "yellow_taxi/route_analysis.parquet"
+      table: "gold_route_analysis"

@@ -31,17 +31,24 @@ def transform_gold(df: pd.DataFrame, lookup: pd.DataFrame | None = None) -> dict
     if "pickup_datetime" in data:
         data["pickup_datetime"] = pd.to_datetime(data["pickup_datetime"], errors="coerce")
 
-    if lookup is not None and not lookup.empty and "pulocation_id" in data:
+    if lookup is not None and not lookup.empty:
         zones = lookup.copy()
         zones.columns = [str(column).lower() for column in zones.columns]
         zones = zones.rename(columns={"locationid": "location_id"})
         if {"location_id", "zone"}.issubset(zones.columns):
             zones = zones[["location_id", "zone"]].drop_duplicates("location_id")
-            data = data.merge(
-                zones.rename(columns={"location_id": "pulocation_id", "zone": "pickup_zone"}),
-                on="pulocation_id",
-                how="left",
-            )
+            if "pulocation_id" in data:
+                data = data.merge(
+                    zones.rename(columns={"location_id": "pulocation_id", "zone": "pickup_zone"}),
+                    on="pulocation_id",
+                    how="left",
+                )
+            if "dolocation_id" in data:
+                data = data.merge(
+                    zones.rename(columns={"location_id": "dolocation_id", "zone": "dropoff_zone"}),
+                    on="dolocation_id",
+                    how="left",
+                )
 
     models = {
         "hourly_demand": _empty(["pickup_hour", "trip_count"]),
@@ -49,6 +56,10 @@ def transform_gold(df: pd.DataFrame, lookup: pd.DataFrame | None = None) -> dict
         "tip_analysis": _empty(["payment_type", "trip_count", "average_tip", "total_tip"]),
         "daily_summary": _empty(["trip_date", "trip_count", "fare_amount", "tip_amount", "total_amount"]),
         "revenue_by_payment": _empty(["payment_type", "trip_count", "revenue"]),
+        "route_analysis": _empty([
+            "pickup_zone", "dropoff_zone", "trip_count",
+            "avg_fare_amount", "total_tip_amount", "avg_tip_percentage",
+        ]),
     }
 
     if "pickup_datetime" in data:
@@ -89,6 +100,20 @@ def transform_gold(df: pd.DataFrame, lookup: pd.DataFrame | None = None) -> dict
         else:
             revenue["revenue"] = 0.0
         models["revenue_by_payment"] = revenue
+
+    if "pickup_zone" in data and "dropoff_zone" in data:
+        route = data.dropna(subset=["pickup_zone", "dropoff_zone"]).copy()
+        grouped = route.groupby(["pickup_zone", "dropoff_zone"], as_index=False).size().rename(columns={"size": "trip_count"})
+        if "fare_amount" in route:
+            fare = route.groupby(["pickup_zone", "dropoff_zone"], as_index=False)["fare_amount"].mean().rename(columns={"fare_amount": "avg_fare_amount"})
+            grouped = grouped.merge(fare, on=["pickup_zone", "dropoff_zone"])
+        if "tip_amount" in route:
+            tip_totals = route.groupby(["pickup_zone", "dropoff_zone"], as_index=False)["tip_amount"].sum().rename(columns={"tip_amount": "total_tip_amount"})
+            grouped = grouped.merge(tip_totals, on=["pickup_zone", "dropoff_zone"])
+        if "tip_percentage" in route:
+            tip_pct = route.groupby(["pickup_zone", "dropoff_zone"], as_index=False)["tip_percentage"].mean().rename(columns={"tip_percentage": "avg_tip_percentage"})
+            grouped = grouped.merge(tip_pct, on=["pickup_zone", "dropoff_zone"])
+        models["route_analysis"] = grouped
 
     return models
 
