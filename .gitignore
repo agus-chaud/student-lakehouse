@@ -18,3 +18,28 @@ data/
 
 # Sistema operativo
 .DS_Store
+Thumbs.db
+
+# Backups de editores
+*~
+*.bak
+*.orig
+
+# Logs sueltos
+*.log
+
+# Cachés de testing y lint
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Bind mounts que crea Airflow al levantar los contenedores
+/dags/
+/logs/
+/plugins/
+/python_scripts/
+/Proyectos/
+
+# Config local de Tutor (Z2H Academy) - contiene identificador de estudiante
+.mcp.json
