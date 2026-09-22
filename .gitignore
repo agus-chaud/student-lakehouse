@@ -1,0 +1,20 @@
+# Entornos virtuales
+venv/
+.venv/
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Datasets (se descargan desde la fuente, no se versionan)
+data/
+
+# Checkpoints de Jupyter
+.ipynb_checkpoints/
+
+# Archivos de swap de editores
+*.swp
+*.swo
+
+# Sistema operativo
+.DS_Store
