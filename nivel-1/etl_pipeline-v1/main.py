@@ -5,7 +5,7 @@ from time import perf_counter
 import pandas as pd
 import pyarrow.parquet as pq
 
-from utils import load_config, setup_logging
+from utils import load_config, measure, setup_logging
 import extract
 from silver import load_silver, transform_silver
 import transform_gold
@@ -71,7 +71,9 @@ def run_pipeline(config_path: str = "config.yml") -> None:
             for index in range(pqfile.num_row_groups)
         ]
         df_bronze = pd.concat(bronze_frames, ignore_index=True)
-        df_silver = transform_silver.run(df_bronze)
+        with measure("transform_silver", rows=len(df_bronze)):
+            df_silver = transform_silver.run(df_bronze)
+        del bronze_frames, df_bronze
         silver_metrics = load_silver.run(cfg, s3, df_silver)
     except Exception as error:
         logger.error(f"Fallo en SILVER: {error}", exc_info=True)
@@ -80,8 +82,10 @@ def run_pipeline(config_path: str = "config.yml") -> None:
     try:
         logger.info("── ETAPA 5: TRANSFORM + LOAD GOLD ──")
         df_zones = pd.read_csv(io.BytesIO(lookup_bytes))
-        gold_models = transform_gold.run(df_silver, df_zones)
-        gold_metrics = load_gold.run(cfg, s3, gold_models)
+        with measure("transform_gold", rows=len(df_silver)):
+            gold_models = transform_gold.run(df_silver, df_zones)
+        with measure("load_gold", rows=sum(len(m) for m in gold_models.values())):
+            gold_metrics = load_gold.run(cfg, s3, gold_models)
     except Exception as error:
         logger.error(f"Fallo en GOLD: {error}", exc_info=True)
         sys.exit(1)

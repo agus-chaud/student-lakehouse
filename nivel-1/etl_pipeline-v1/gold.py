@@ -18,7 +18,13 @@ def _empty(columns: list[str]) -> pd.DataFrame:
 
 
 def transform_gold(df: pd.DataFrame, lookup: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
-    data = df.copy()
+    needed = {
+        "tpep_pickup_datetime", "pickup_datetime", "pulocationid", "pulocation_id",
+        "dolocationid", "dolocation_id", "payment_type", "fare_amount",
+        "tip_amount", "total_amount", "tip_percentage",
+    }
+    keep = [column for column in df.columns if str(column).lower() in needed]
+    data = df[keep].copy()
     data.columns = [str(column).lower() for column in data.columns]
     data = data.rename(
         columns={

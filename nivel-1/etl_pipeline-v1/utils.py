@@ -13,7 +13,7 @@ NO sabe nada de MinIO, Postgres ni Parquet.
 import os
 import time
 import logging
-import tracemalloc
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Optional
@@ -61,39 +61,45 @@ class StageMetrics:
         )
 
 
+def _rss_mb() -> float:
+    with open("/proc/self/statm") as f:
+        return int(f.read().split()[1]) * os.sysconf("SC_PAGE_SIZE") / (1024 ** 2)
+
+
 @contextmanager
-def measure(stage: str, rows: int = 0, extra: Optional[dict] = None, track_memory: bool = False):
+def measure(stage: str, rows: int = 0, extra: Optional[dict] = None):
     """
-    Context manager que mide tiempo (y opcionalmente memoria) de una etapa.
+    Mide tiempo y memoria (RSS del proceso) de una etapa.
 
-    track_memory=True solo para etapas livianas (extract, schema).
-    NO usar en loops de carga masiva: tracemalloc instrumenta cada
-    allocación Python, lo que penaliza severamente operaciones de I/O
-    intensivo como COPY FROM STDIN sobre millones de filas.
-
-    Uso:
-        with measure("extract", track_memory=True) as m:
-            ...
-        with measure("load") as m:   # solo tiempo, sin overhead
-            ...
+    peak_mem = máximo RSS observado durante la etapa (muestreo cada 20 ms).
+    Incluye memoria de pandas/pyarrow, que tracemalloc no ve. Es el uso
+    total del proceso, no solo lo que asigna la etapa; se agrega
+    extra["rss_delta_mb"] con lo que creció respecto al inicio.
     """
-    if track_memory:
-        tracemalloc.start()
+    rss_start = _rss_mb()
+    peak = [rss_start]
+    stop = threading.Event()
+
+    def _sample():
+        while not stop.wait(0.02):
+            peak[0] = max(peak[0], _rss_mb())
+
+    sampler = threading.Thread(target=_sample, daemon=True)
+    sampler.start()
 
     t_start = time.perf_counter()
     metrics = StageMetrics(stage=stage, rows_processed=rows, extra=extra or {})
-    yield metrics
-
-    elapsed = time.perf_counter() - t_start
-    metrics.elapsed_seconds = elapsed
-
-    if track_memory:
-        _, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        metrics.peak_memory_mb = peak / (1024 ** 2)
-
-    metrics.rows_processed = rows
-    metrics.log()
+    try:
+        yield metrics
+    finally:
+        stop.set()
+        sampler.join()
+        metrics.elapsed_seconds = time.perf_counter() - t_start
+        peak[0] = max(peak[0], _rss_mb())
+        metrics.peak_memory_mb = peak[0]
+        metrics.extra["rss_delta_mb"] = round(peak[0] - rss_start, 1)
+        metrics.rows_processed = rows or metrics.rows_processed
+        metrics.log()
 
 
 # ─────────────────────────────────────────────
