@@ -155,6 +155,7 @@ Las credenciales (MinIO y PostgreSQL) se leen de variables de entorno; si falta 
 ## 6. Pendientes y cosas a tener en cuenta
 
 - **`dags/` ya se versiona** (se quitó del `.gitignore` y se commiteó).
+- **Decidir si se corrige la zona "N/A" en el pipeline pandas** (ver sección 4e).
 - **Falta probar un fallo real** (por ejemplo, apagar MinIO a mitad de ejecución) para confirmar que el reintento automático (`retries: 1`) funciona. Solo se probó el caso normal y el reintento manual de una tarea.
 - **Cada etapa depende de que la anterior haya corrido al menos una vez.** Si Silver no existe en MinIO, Gold falla. Es lo esperado.
 - **Solo se procesa enero 2024.** La URL está fija en `config.yml`, aunque el DAG corre `@daily`.
