@@ -1,0 +1,61 @@
+# ============================================================
+# ETL Pipeline - Configuracion externa
+# El codigo no debe cambiar cuando cambia el entorno.
+# Solo cambia este archivo.
+# ============================================================
+
+source:
+  url: "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet"
+
+minio:
+  endpoint: "http://localhost:9000"
+
+bronze:
+  bucket: "bronze"
+  object_path: "yellow_taxi/yellow_tripdata_2024-01.parquet"
+  log_every_n_groups: 1
+
+postgres:
+  host: "localhost"
+  port: 5432
+  db: "postgres"
+  user: "postgres"
+  table: "yellow_taxi_data"
+
+pipeline:
+  log_every_n_groups: 1
+
+# Dataset de referencia geografica: Bronze unicamente.
+# Gold lo lee directamente desde esta capa.
+lookup:
+  url: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+  bucket: "bronze"
+  object_path: "taxi_zone_lookup/taxi_zone_lookup.csv"
+
+# Capa Silver: viajes limpios y enriquecidos.
+silver:
+  bucket: "silver"
+  object_path: "yellow_taxi/yellow_tripdata_2024-01.parquet"
+
+# Capa Gold: modelos analiticos pre-agregados.
+gold:
+  bucket: "gold"
+  models:
+    hourly_demand:
+      object_path: "yellow_taxi/hourly_demand.parquet"
+      table: "gold_hourly_demand"
+    zone_performance:
+      object_path: "yellow_taxi/zone_performance.parquet"
+      table: "gold_zone_performance"
+    tip_analysis:
+      object_path: "yellow_taxi/tip_analysis.parquet"
+      table: "gold_tip_analysis"
+    daily_summary:
+      object_path: "yellow_taxi/daily_summary.parquet"
+      table: "gold_daily_summary"
+    revenue_by_payment:
+      object_path: "yellow_taxi/revenue_by_payment.parquet"
+      table: "gold_revenue_by_payment"
+    route_analysis:
+      object_path: "yellow_taxi/route_analysis.parquet"
+      table: "gold_route_analysis"
