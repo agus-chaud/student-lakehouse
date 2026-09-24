@@ -34,7 +34,7 @@
     "editor.formatOnSave": true
   },
 
-  "forwardPorts": [8080, 6443, 8888],
+  "forwardPorts": [7777, 8080, 6443, 8888],
 
   "postCreateCommand": "echo 'Platform image cargada correctamente.'"
 }
