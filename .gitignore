@@ -35,7 +35,6 @@ Thumbs.db
 .coverage
 
 # Bind mounts que crea Airflow al levantar los contenedores
-/dags/
 /logs/
 /plugins/
 /python_scripts/
@@ -45,3 +44,4 @@ Thumbs.db
 .mcp.json
 DE.docx
 .gitignore
+DE_backup_2026-09-23.docx
