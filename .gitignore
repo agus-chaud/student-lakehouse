@@ -43,3 +43,5 @@ Thumbs.db
 
 # Config local de Tutor (Z2H Academy) - contiene identificador de estudiante
 .mcp.json
+DE.docx
+.gitignore
