@@ -154,11 +154,11 @@ Las credenciales (MinIO y PostgreSQL) se leen de variables de entorno; si falta 
 
 ## 6. Pendientes y cosas a tener en cuenta
 
-- **`dags/` ya se versiona** (se quitó del `.gitignore` y se commiteó).
-- **Decidir si se corrige la zona "N/A" en el pipeline pandas** (ver sección 4e).
+- **`dags/` está en `.gitignore`** (línea 38). Los cambios en el pipeline y los DAGs **no aparecen en `git status`** y un commit no los incluiría. Hay que decidir si se versiona esa carpeta.
 - **Falta probar un fallo real** (por ejemplo, apagar MinIO a mitad de ejecución) para confirmar que el reintento automático (`retries: 1`) funciona. Solo se probó el caso normal y el reintento manual de una tarea.
 - **Cada etapa depende de que la anterior haya corrido al menos una vez.** Si Silver no existe en MinIO, Gold falla. Es lo esperado.
 - **Solo se procesa enero 2024.** La URL está fija en `config.yml`, aunque el DAG corre `@daily`.
-- **Git:** lo anterior ya está commiteado; solo queda sin seguimiento `DE_backup_2026-09-23.docx` (respaldo, se deja fuera a propósito).
+
+- **`nivel-2/etl_pipeline-polars/` sin commit** (incluye su `requirements.txt`). Falta decidir si se corrige la diferencia de la zona "N/A" en la versión pandas.
 - **Contenedores `minio` y `postgres-container` quedaron levantados** tras las pruebas.
 - **El DAG viejo `etl_pipeline_v2`** sigue existiendo y convive con el nuevo. Se puede retirar cuando ya no haga falta.
