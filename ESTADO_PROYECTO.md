@@ -1,6 +1,17 @@
 # Estado del proyecto — Student Lakehouse
 
-*Actualizado: 2026-09-24 (versión Polars en nivel-2)*
+*Actualizado: 2026-11-25 (pipeline Polars corriendo en Airflow; Fase 3, un mes por ejecución, en diseño)*
+
+## 0. Novedades (noviembre 2026)
+
+- **El pipeline Polars corre en Airflow** con el DAG `etl_pipeline_polars` (3 tareas: `extract_bronze → process_silver → process_gold`). Se validó el 2026-11-25 con una ejecución manual en verde desde la UI.
+  - Código en `dags/etl_pipeline_polars/` (copia del pipeline de `nivel-2/` con imports de paquete: `from etl_pipeline_polars import ...`).
+  - Imagen propia de Airflow con Polars: `nivel-2/airflow-image/` (Airflow 2.11.2, Python 3.12, Polars 2.2). Se construye con `docker build -t airflow-polars:latest -f nivel-2/airflow-image/Dockerfile nivel-2/airflow-image/`, y `docker-compose.yml` la usa en todos los servicios de Airflow.
+  - Conteos Gold de enero 2024: hourly_demand 749, zone_performance 253, daily_summary 35, tip_analysis 4, revenue_by_payment 4, route_analysis 23.528.
+- **Bug resuelto, `localhost` dentro de un contenedor:** el `config.yml` de Polars apuntaba a `localhost` (sirve para correrlo desde la terminal). Dentro del worker de Airflow, `localhost` es el propio contenedor. La copia de `dags/` usa los nombres de servicio de Docker: `minio:9000` y `postgres-2`.
+- **La imagen oficial de MinIO ya no se puede descargar** (quay.io y Docker Hub responden "no autorizado / no existe"). Se reemplazó por `bitnamilegacy/minio:latest` (MinIO de mayo 2025, congelada y sin actualizaciones). Cambios en el servicio: datos en `/bitnami/minio/data` y sin `command` propio. La consola web (9001) no arranca; los buckets se revisan con `mc` dentro del contenedor.
+- **`.env` fuera del repo:** está en `.gitignore` y se agregó `.env.example` sin contraseñas. Decisión: no se cambian las contraseñas (son las del curso) y los archivos `config/*.env` siguen versionados.
+- **Fase 3 (en curso): un mes por ejecución + backfill de 2024.** Ver sección 7.
 
 ## 1. ¿Qué es este proyecto?
 
@@ -146,19 +157,29 @@ Ambas formas hacen lo mismo: dejar las tablas Gold en la base `postgres`. Cambia
 
 ## 5. Cómo ejecutarlo
 
-1. Levantar los servicios: `docker compose up -d` (para el pipeline bastan Airflow, MinIO, PostgreSQL y Redis).
-2. Abrir Airflow en `http://localhost:7777`.
-3. Activar el DAG `etl_pipeline` y dispararlo.
+1. Si la imagen no existe (Codespace nuevo), construirla: `docker build -t airflow-polars:latest -f nivel-2/airflow-image/Dockerfile nivel-2/airflow-image/`.
+2. Levantar solo lo necesario: `docker compose up -d postgres postgres-2 redis minio airflow-init airflow-scheduler airflow-worker airflow-webserver airflow-triggerer`.
+3. Abrir Airflow en el puerto `7777` (en Codespaces: la URL privada `...-7777.app.github.dev`).
+4. Activar el DAG `etl_pipeline_polars` y dispararlo.
 
 Las credenciales (MinIO y PostgreSQL) se leen de variables de entorno; si falta alguna, el pipeline falla con un mensaje claro.
 
 ## 6. Pendientes y cosas a tener en cuenta
 
-- **`dags/` está en `.gitignore`** (línea 38). Los cambios en el pipeline y los DAGs **no aparecen en `git status`** y un commit no los incluiría. Hay que decidir si se versiona esa carpeta.
-- **Falta probar un fallo real** (por ejemplo, apagar MinIO a mitad de ejecución) para confirmar que el reintento automático (`retries: 1`) funciona. Solo se probó el caso normal y el reintento manual de una tarea.
+- **Falta probar un fallo real** (por ejemplo, apagar MinIO a mitad de una ejecución) para confirmar que el reintento automático (`retries: 1`) recupera la tarea. Lo único que se vio fue el reintento fallando dos veces por el bug de `localhost`.
 - **Cada etapa depende de que la anterior haya corrido al menos una vez.** Si Silver no existe en MinIO, Gold falla. Es lo esperado.
-- **Solo se procesa enero 2024.** La URL está fija en `config.yml`, aunque el DAG corre `@daily`.
+- **Solo se procesa enero 2024.** Se resuelve en la Fase 3 (sección 7).
+- **Registro de ejecuciones:** pendiente una tabla de auditoría `pipeline_runs` (mes, etapa, filas, duración, estado, error).
+- **El DAG viejo `etl_pipeline_v2`** sigue existiendo y convive con los nuevos. Se retira al cierre. La zona "N/A" no se corrige en pandas porque esa versión se retira.
+- **Versiones sin fijar** en `nivel-2/airflow-image/requirements.txt`: cada build puede traer versiones nuevas (hoy Polars 2.2).
+- Resuelto: `dags/` ya se versiona y `nivel-2/etl_pipeline-polars/` está en el repo.
 
-- **`nivel-2/etl_pipeline-polars/` sin commit** (incluye su `requirements.txt`). Falta decidir si se corrige la diferencia de la zona "N/A" en la versión pandas.
-- **Contenedores `minio` y `postgres-container` quedaron levantados** tras las pruebas.
-- **El DAG viejo `etl_pipeline_v2`** sigue existiendo y convive con el nuevo. Se puede retirar cuando ya no haga falta.
+## 7. Fase 3 (en curso): un período por ejecución y backfill de 2024
+
+Objetivo: que cada ejecución procese **un mes de un año** y poder recuperar la historia. Hoy se procesa solo 2024, pero el diseño sirve para varios años.
+
+- **Fuente:** NYC TLC publica los datos **mensualmente, con ~2 meses de demora**. No hay archivos diarios.
+- **DAG mensual** (`@monthly`, `catchup=True`, de 2024-01 a 2024-12, `max_active_runs=1` para no exceder la memoria del Codespace). Cada ejecución toma el año y el mes de su período de datos (`data_interval_start`).
+- **Config con marcadores** `{year}` y `{month}` en la URL y en las rutas. El pipeline los completa antes de arrancar.
+- **MinIO particionado por año y mes:** `.../year=2024/month=01/...` en Bronze, Silver y Gold.
+- **PostgreSQL:** las tablas Gold llevan columnas `year` y `month`. Cada carga borra solo las filas de ese año y mes e inserta las nuevas, así sigue siendo idempotente. **Sin particionamiento nativo de PostgreSQL**: las tablas Gold son chicas y no se justifica la complejidad.
