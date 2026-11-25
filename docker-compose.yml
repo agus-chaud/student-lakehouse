@@ -1,5 +1,5 @@
 x-airflow-common: &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-z2hx/airflow}
+  image: ${AIRFLOW_IMAGE_NAME:-airflow-polars:latest}
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -242,15 +242,14 @@ services:
   minio:
     container_name: "minio"
     restart: "always"
-    image: quay.io/minio/minio:RELEASE.2022-08-26T19-53-15Z
+    image: bitnamilegacy/minio:latest
     env_file:
         - ./config/minio.env
     volumes:
-        - minio_volume:/data
+        - minio_volume:/bitnami/minio/data
     ports:
         - 9000:9000
         - 9001:9001
-    command: server /data --console-address ":9001"
 
   pgadmin:
     container_name: "pgadmin"

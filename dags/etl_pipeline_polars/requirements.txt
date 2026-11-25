@@ -1,0 +1,8 @@
+polars
+pyarrow
+boto3
+requests
+pyyaml
+sqlalchemy
+psycopg2-binary
+pandas

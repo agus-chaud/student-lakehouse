@@ -1,0 +1,16 @@
+apache-airflow-providers-google
+psycopg2-binary
+pandas
+sqlalchemy
+boto3
+pyyaml
+polars[pyarrow]
+pyarrow
+jupysql
+psycopg
+pandasql
+fastparquet
+pgcli
+minio
+python-dotenv
+requests
