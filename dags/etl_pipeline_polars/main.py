@@ -5,7 +5,7 @@ from time import perf_counter
 import polars as pl
 import pyarrow.parquet as pq
 
-from etl_pipeline_polars.utils import load_config, measure, setup_logging
+from etl_pipeline_polars.utils import load_config, measure, resolve_period, setup_logging
 from etl_pipeline_polars import extract
 from etl_pipeline_polars.silver import load_silver, transform_silver
 from etl_pipeline_polars import transform_gold
@@ -56,10 +56,11 @@ def stage_gold(cfg: dict, s3) -> dict:
 STAGES = {"extract": stage_extract, "silver": stage_silver, "gold": stage_gold}
 
 
-def run_pipeline(config, stages=None) -> None:
+def run_pipeline(config, stages=None, year=None, month=None) -> None:
     """Ejecuta las etapas indicadas (por defecto todas, en orden).
 
     `config` puede ser una ruta a config.yml o un dict ya cargado.
+    `year` y `month` eligen el período a procesar (por defecto, los del config).
     Las etapas se comunican solo vía S3, por eso pueden correr por separado.
     Ante un error la excepción se propaga (Airflow marca la tarea como fallida).
     """
@@ -72,6 +73,8 @@ def run_pipeline(config, stages=None) -> None:
     logger.info("Pipeline ETL iniciado — etapas: %s", stages)
 
     cfg = load_config(config) if isinstance(config, (str, os.PathLike)) else config
+    cfg = resolve_period(cfg, year=year, month=month)
+    logger.info("Período: %04d-%02d", cfg["period"]["year"], cfg["period"]["month"])
     s3 = extract.build_s3_client(cfg)
 
     results = {}
@@ -95,8 +98,10 @@ if __name__ == "__main__":
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--stages", nargs="+", choices=list(STAGES), default=None,
                         help="Etapas a ejecutar (por defecto: todas)")
+    parser.add_argument("--year", type=int, default=None, help="Año a procesar")
+    parser.add_argument("--month", type=int, default=None, help="Mes a procesar (1-12)")
     args = parser.parse_args()
     try:
-        run_pipeline(args.config, stages=args.stages)
+        run_pipeline(args.config, stages=args.stages, year=args.year, month=args.month)
     except Exception:
         sys.exit(1)

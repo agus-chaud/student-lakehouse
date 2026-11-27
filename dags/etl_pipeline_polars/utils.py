@@ -127,3 +127,36 @@ def _require_env(var: str) -> str:
             f"Asegúrate de exportarla antes de correr el pipeline."
         )
     return value
+
+
+# ─────────────────────────────────────────────
+# PERIODO (año y mes)
+# ─────────────────────────────────────────────
+
+def resolve_period(cfg: dict, year: Optional[int] = None, month: Optional[int] = None) -> dict:
+    """Devuelve una copia de cfg con los marcadores {year} y {month} completados.
+
+    Si no se indica año o mes, usa pipeline.default_year / default_month.
+    Agrega cfg["period"] = {"year": 2024, "month": 1} para que lo usen las etapas.
+    """
+    import copy
+
+    year = int(year if year is not None else cfg["pipeline"]["default_year"])
+    month = int(month if month is not None else cfg["pipeline"]["default_month"])
+    if not 1 <= month <= 12:
+        raise ValueError(f"Mes inválido: {month}. Debe estar entre 1 y 12.")
+
+    values = {"year": f"{year:04d}", "month": f"{month:02d}"}
+
+    def _fill(node):
+        if isinstance(node, dict):
+            return {k: _fill(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [_fill(v) for v in node]
+        if isinstance(node, str) and "{" in node:
+            return node.format(**values)
+        return node
+
+    resolved = _fill(copy.deepcopy(cfg))
+    resolved["period"] = {"year": year, "month": month}
+    return resolved

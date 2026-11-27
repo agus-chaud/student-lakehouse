@@ -6,7 +6,7 @@ import logging
 import polars as pl
 
 from etl_pipeline_polars.extract import ensure_bucket
-from etl_pipeline_polars.load import load_dataframe_to_postgres
+from etl_pipeline_polars.load import load_dataframe_to_postgres, load_period_to_postgres
 
 logger = logging.getLogger("etl_pipeline")
 
@@ -150,7 +150,11 @@ def persist_gold(
             Body=_parquet_bytes(frame),
         )
         if load_postgres:
-            load_dataframe_to_postgres(cfg, model_cfg["table"], frame)
+            period = cfg.get("period")
+            if period:
+                load_period_to_postgres(cfg, model_cfg["table"], frame, period["year"], period["month"])
+            else:
+                load_dataframe_to_postgres(cfg, model_cfg["table"], frame)
         metrics[name] = {"rows": frame.height}
         logger.info("Gold persistido | modelo=%s | filas=%s", name, frame.height)
     return metrics
