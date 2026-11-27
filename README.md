@@ -1,4 +1,4 @@
-# Student Lakehouse — Pipeline de datos de taxis de NYC
+# Pipeline de datos de taxis de NYC
 
 Pipeline batch que convierte los viajes crudos de taxis amarillos de Nueva York en tablas listas para responder preguntas de negocio: **¿en qué horarios se concentra la demanda?, ¿qué zonas y rutas mueven más viajes e ingresos?, ¿cómo cambian las propinas según la forma de pago?**, etc.
 
